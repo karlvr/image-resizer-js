@@ -1,4 +1,4 @@
-import exif from './exif';
+import getExif from './exif';
 
 const EXIF_TRANSFORMS = {
   1: { rotate: 0, flip: false },
@@ -11,17 +11,6 @@ const EXIF_TRANSFORMS = {
   8: { rotate: Math.PI * 1.5, flip: false },
 };
 
-// TODO: move this on exif.js
-const inkjet = {
-  exif: buf =>
-    new Promise((resolve, reject) =>
-      exif(buf, (err, metadata) => {
-        if (err) return reject(err);
-        return resolve(metadata);
-      }),
-    ),
-};
-
 const transformCanvas = (ctx, degrees = 0, flip = false) => {
   ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
   ctx.rotate(degrees);
@@ -29,7 +18,7 @@ const transformCanvas = (ctx, degrees = 0, flip = false) => {
   return ctx;
 };
 
-const exifTransformCanvas = (ctx, orientation) => {
+const rotate = (ctx, orientation) => {
   const transform = EXIF_TRANSFORMS[orientation];
   if (transform) {
     return transformCanvas(ctx, transform.rotate, transform.flip);
@@ -37,7 +26,7 @@ const exifTransformCanvas = (ctx, orientation) => {
   return ctx;
 };
 
-const getCanvasForImage = (image, maxWidth, size) => {
+const getCanvasForImage = (maxWidth, size) => {
   const canvas = document.createElement('canvas');
   let w = size.width;
   let h = size.height;
@@ -50,6 +39,7 @@ const getCanvasForImage = (image, maxWidth, size) => {
 
   canvas.width = w;
   canvas.height = h;
+
   return canvas;
 };
 
@@ -63,14 +53,14 @@ const createImage = binary =>
   });
 
 const rotateAndResize = async (
-  inkjetImage,
+  binary,
   exifOrientationId,
-  maxWidth = 800,
+  maxWidth = undefined,
 ) => {
-  if (!EXIF_TRANSFORMS[exifOrientationId]) return inkjetImage;
+  if (!EXIF_TRANSFORMS[exifOrientationId]) return binary;
 
-  const image = await createImage(inkjetImage);
-  const canvas = getCanvasForImage(inkjetImage, maxWidth, {
+  const image = await createImage(binary);
+  const canvas = getCanvasForImage(maxWidth || image.width, {
     width: image.width,
     height: image.height,
   });
@@ -84,7 +74,7 @@ const rotateAndResize = async (
     canvas.height = temp;
   }
 
-  const ctx = exifTransformCanvas(canvas.getContext('2d'), exifOrientationId);
+  const ctx = rotate(canvas.getContext('2d'), exifOrientationId);
 
   ctx.drawImage(image, 0, 0, image.width, image.height, -w / 2, -h / 2, w, h);
 
@@ -94,21 +84,30 @@ const rotateAndResize = async (
     return canvas.msToBlob();
   }
 
-  return inkjetImage;
+  return binary;
 };
 
-const Lightening = async (binary, maxWidth = 800) => {
-  try {
-    const metadata = await inkjet.exif(binary);
-    let orientation = 1;
-    if (metadata.Orientation) orientation = metadata.Orientation.value;
+const Resizer = async (binary, maxWidth) => {
+  let metadata;
+  let orientation = 1;
 
+  try {
+    metadata = await getExif(binary);
+    console.log('metadata', metadata);
+
+    if (metadata.Orientation) orientation = metadata.Orientation.value;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('exif parser error:', e);
+  }
+
+  try {
     return await rotateAndResize(binary, orientation, maxWidth);
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error('error', e);
+    console.error('canvas rotate error:', e);
     return binary;
   }
 };
 
-export default Lightening;
+export default Resizer;

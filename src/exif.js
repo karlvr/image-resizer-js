@@ -1,18 +1,20 @@
-import { ExifReader } from './exifReader';
+import ExifReader from './exifReader';
 
-export default function(buf, cb) {
-  try {
-    const exif = new ExifReader();
-    exif.load(buf);
+export default buf =>
+  new Promise((resolve, reject) => {
+    try {
+      const exif = new ExifReader();
 
-    const metadata = exif.getAllTags();
+      exif.load(buf);
 
-    cb(null, metadata);
-  } catch (err) {
-    if (err.message === 'No Exif data') {
-      cb(null, {});
-    } else {
-      cb(err);
+      const metadata = exif.getAllTags();
+
+      resolve(metadata);
+    } catch (err) {
+      if (err.message === 'No Exif data') {
+        resolve({});
+      } else {
+        reject(err);
+      }
     }
-  }
-}
+  });

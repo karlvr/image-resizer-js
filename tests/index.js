@@ -7,6 +7,7 @@ describe('test compression', () => {
     let originalBlob;
     let resizedBlob;
 
+    document.querySelector('body').appendChild(original);
     document.querySelector('body').appendChild(resized);
 
     fetch(
@@ -31,7 +32,7 @@ describe('test compression', () => {
         console.log('resizedBlob.size', resizedBlob.size, originalBlob.size);
         expect(resizedBlob.size).toBeLessThan(originalBlob.size);
       })
-      // .then(() => new Promise(resolve => setTimeout(() => resolve(), 2000)))
+      .then(() => new Promise(resolve => setTimeout(() => resolve(), 2000)))
       .then(() => done())
       .catch(err => console.error('coucou', err));
   });
